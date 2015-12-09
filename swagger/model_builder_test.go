@@ -1,6 +1,7 @@
 package swagger
 
 import (
+	"net"
 	"testing"
 	"time"
 )
@@ -1035,4 +1036,107 @@ func TestPtrDescription(t *testing.T) {
    }
   }`
 	testJsonFromStruct(t, b, expected)
+}
+
+type A struct {
+	B  `json:",inline"`
+	C1 `json:"metadata,omitempty"`
+}
+
+type B struct {
+	SB string
+}
+
+type C1 struct {
+	SC string
+}
+
+func (A) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"":         "A struct",
+		"B":        "B field", // We should not get anything from this
+		"metadata": "C1 field",
+	}
+}
+
+func (B) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"":   "B struct",
+		"SB": "SB field",
+	}
+}
+
+func (C1) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"":   "C1 struct",
+		"SC": "SC field",
+	}
+}
+
+func TestNestedStructDescription(t *testing.T) {
+	expected := `
+{
+  "swagger.A": {
+   "id": "swagger.A",
+   "description": "A struct",
+   "required": [
+    "SB"
+   ],
+   "properties": {
+    "SB": {
+     "type": "string",
+     "description": "SB field"
+    },
+    "metadata": {
+     "$ref": "swagger.C1",
+     "description": "C1 field"
+    }
+   }
+  },
+  "swagger.C1": {
+   "id": "swagger.C1",
+   "description": "C1 struct",
+   "required": [
+    "SC"
+   ],
+   "properties": {
+    "SC": {
+     "type": "string",
+     "description": "SC field"
+    }
+   }
+  }
+ }
+`
+	testJsonFromStruct(t, A{}, expected)
+}
+
+// This tests a primitive with type overrides in the struct tags
+type FakeInt int
+type E struct {
+	Id FakeInt `type:"integer"`
+	IP net.IP  `type:"string"`
+}
+
+func TestOverridenTypeTagE1(t *testing.T) {
+	expected := `
+{
+  "swagger.E": {
+   "id": "swagger.E",
+   "required": [
+    "Id",
+    "IP"
+   ],
+   "properties": {
+    "Id": {
+     "type": "integer"
+    },
+    "IP": {
+     "type": "string"
+    }
+   }
+  }
+ }
+`
+	testJsonFromStruct(t, E{}, expected)
 }
